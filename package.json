@@ -1,0 +1,34 @@
+{
+  "name": "huge-uploader-nodejs-client",
+  "version": "0.0.1",
+  "description": "Node client version of the frontend browser huge-uploader module. Handles huge file uploads by chunking them.",
+  "main": "lib/index.js",
+  "module": "src/index.js",
+  "files": [
+    "src",
+    "lib"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Buzut/huge-uploader.git"
+  },
+  "keywords": [
+    "upload",
+    "file upload",
+    "huge file upload",
+    "big file upload",
+    "resumable upload",
+    "pausable upload",
+    "chunked upload",
+    "fault tolerent"
+  ],
+  "author": "Kevin Aird",
+  "license": "BSD-3-Clause",
+  "bugs": {
+    "url": "https://github.com/Buzut/huge-uploader/issues"
+  },
+  "dependencies": {
+    "form-data": "^4.0.0",
+    "node-fetch": "^3.3.0"
+  }
+}
