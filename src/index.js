@@ -2,8 +2,8 @@
 
 const EventEmitter = require('events');
 const fs = require("fs");
-const fetch = require("node-fetch");
 const FormData = require("form-data");
+const fetch = require("./fetchTimeout");
 
 class HugeUploaderNodeClient {
 
@@ -16,6 +16,8 @@ class HugeUploaderNodeClient {
         this.chunkSizeBytes = this.chunkSize * 1024 * 1024;
         this.retries = params.retries || 5;
         this.delayBeforeRetry = params.delayBeforeRetry || 5;
+        this.verbose = !!params.verbose;
+        this.chunkTimeout = params.chunkTimeout || (60 * 60 * 1000);
 
         this.start = 0;
         this.chunk = Buffer.alloc(this.chunkSizeBytes);
@@ -34,6 +36,15 @@ class HugeUploaderNodeClient {
         this.headers['uploader-chunks-total'] = this.totalChunks;
 
         this._startSending();
+    }
+
+    /**
+     * Custom logger
+     */
+    log() {
+        if(!this.verbose) return;
+        const args = Array.from(arguments);
+        console.log.apply(this,args);
     }
 
     /**
@@ -68,7 +79,7 @@ class HugeUploaderNodeClient {
      */
     async _getChunk() {
         const nread = await new Promise((resolve,reject)=> {
-            console.log("reading fd",this.fd,"for chunk",this.chunkCount);
+            this.log("reading fd",this.fd,"for chunk",this.chunkCount);
             fs.read(this.fd,this.chunk,0,this.chunkSizeBytes,null,(err,nread)=>{
                 if(err) return reject(err);
                 return resolve(nread);
@@ -76,7 +87,7 @@ class HugeUploaderNodeClient {
         });
 
         if(nread===0) {
-            console.log("closing fd",this.fd,"after chunk",this.chunkCount,"total chunk=",this.totalChunks);
+            this.log("closing fd",this.fd,"after chunk",this.chunkCount,"total chunk=",this.totalChunks);
             await new Promise((resolve,reject)=>fs.close(this.fd,err=>{
                 if(err) return reject(err);
                 return resolve();
@@ -84,7 +95,7 @@ class HugeUploaderNodeClient {
             return;
         }
 
-        console.log("read",nread,"bytes for",this.fd,"for chunk",this.chunkCount);
+        this.log("read",nread,"bytes for",this.fd,"for chunk",this.chunkCount);
 
         if(nread<this.chunkSizeBytes)
             return { data: this.chunk.slice(0,nread), lastChunk: true };
@@ -96,7 +107,7 @@ class HugeUploaderNodeClient {
      * Send chunk of the file with appropriate headers and add post parameters if it's last chunk
      */
     _sendChunk({ data, lastChunk }) {
-        console.log("sending chunk",this.chunkCount,"lastChunk=",lastChunk);
+        this.log("sending chunk",this.chunkCount,"lastChunk=",lastChunk);
         const form = new FormData();
 
         // send post fields on last request
@@ -105,7 +116,7 @@ class HugeUploaderNodeClient {
         form.append('file', data,{contentType:"application/octet-stream"});
         this.headers['uploader-chunk-number'] = this.chunkCount;
 
-        return fetch(this.endpoint, { method: 'POST', headers: this.headers, body: form });
+        return fetch(this.endpoint, { method: 'POST', headers: this.headers, body: form, timeout: this.chunkTimeout });
     }
 
     /**
@@ -133,7 +144,7 @@ class HugeUploaderNodeClient {
         return this._getChunk()
         .then((out) => this._sendChunk(out))
         .then((res) => { 
-            console.log("huge uploader res.status",res.status);
+            this.log("huge uploader res.status",res.status);
             if (res.status === 200 || res.status === 201 || res.status === 204) {
                 if (++this.chunkCount < this.totalChunks) this._sendChunks();
                 else this._eventTarget.emit('finish');
@@ -152,7 +163,7 @@ class HugeUploaderNodeClient {
             }
         })
         .catch((err) => { 
-            console.log("huge uploader err",err);
+            this.log("huge uploader err",err);
 
             // this type of error can happen after network disconnection on CORS setup
             this._manageRetries();
@@ -167,13 +178,13 @@ class HugeUploaderNodeClient {
             fs.open(this.file,'r',(err,fd)=>{
                 if(err) return reject(err);
                 this.fd = fd;
-                console.log("opened fd",fd);
+                this.log("opened fd",fd);
                 return resolve();
             });
         })
         .then(()=>this._sendChunks())
         .catch((err)=>{
-            console.log("huge uploader start err",err);
+            this.log("huge uploader start err",err);
             this._eventTarget.emit('error', 'Failed starting to sending chunks');
         });
     }

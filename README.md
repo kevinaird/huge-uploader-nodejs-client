@@ -52,6 +52,8 @@ The constructor takes a settings object. Available options are:
 * `headers { Object }` – custom headers to send with each request
 * `postParams { Object }` – post parameters that __will be sent with the last chunk__
 * `chunkSize { Number }` – size of each chunk in MB (default is 10MB)
+* `verbose { Boolean}` - Enable verbose logging
+* `chunkTimeout { Number }` - Optional timeout for each individual chunk upload (default is disabled)
 
 
 #### `error`
